@@ -468,12 +468,6 @@ def unarchive_recording(project_id: int, recording_id: int, account_id: Optional
         raise click.Abort()
 
 
-@cli.group()
-def search():
-    """Search across Basecamp content."""
-    pass
-
-
 def _handle_search_pagination(client: BasecampAPIClient, query: str, recording_type: Optional[str],
                                bucket_id: Optional[int], creator_id: Optional[int], file_type: Optional[str],
                                exclude_chat: bool, page: int, per_page: int, format: str, all_pages: bool,
@@ -550,7 +544,7 @@ def _handle_search_pagination(client: BasecampAPIClient, query: str, recording_t
     return all_results
 
 
-@search.command("metadata")
+@cli.command("search-metadata")
 @click.option("--account-id", type=int, help="Basecamp Account ID (uses configured default if not provided)")
 @click.option("--format", type=click.Choice(["json", "table", "plain"]), default="plain", help="Output format (json, table, plain)")
 def search_metadata(account_id: Optional[int], format: str):
@@ -567,21 +561,21 @@ def search_metadata(account_id: Optional[int], format: str):
         raise click.Abort()
 
 
-@search.command()
+@cli.command("search")
 @click.argument("query")
-@click.option("--type", "recording_type", help="Filter by recording type (use 'basecamp search metadata' to see valid types)")
+@click.option("--type", "recording_type", help="Filter by recording type (use 'basecamp search-metadata' to see valid types)")
 @click.option("--bucket-id", type=int, help="Filter by project ID")
 @click.option("--creator-id", type=int, help="Filter by creator person ID")
-@click.option("--file-type", help="Filter attachments by type (use 'basecamp search metadata' to see valid file types)")
+@click.option("--file-type", help="Filter attachments by type (use 'basecamp search-metadata' to see valid file types)")
 @click.option("--exclude-chat", is_flag=True, help="Exclude chat results")
 @click.option("--page", type=int, default=1, help="Page number (default: 1)")
 @click.option("--per-page", type=int, default=50, help="Results per page (default: 50)")
 @click.option("--account-id", type=int, help="Basecamp Account ID (uses configured default if not provided)")
 @click.option("--format", type=click.Choice(["json", "table", "plain"]), default="plain", help="Output format (json, table, plain)")
 @click.option("--all-pages", is_flag=True, help="Automatically load all pages without interaction")
-def search_recordings(query: str, recording_type: Optional[str], bucket_id: Optional[int], 
-                     creator_id: Optional[int], file_type: Optional[str], exclude_chat: bool,
-                     page: int, per_page: int, account_id: Optional[int], format: str, all_pages: bool):
+def search(query: str, recording_type: Optional[str], bucket_id: Optional[int], 
+           creator_id: Optional[int], file_type: Optional[str], exclude_chat: bool,
+           page: int, per_page: int, account_id: Optional[int], format: str, all_pages: bool):
     """Search recordings across the account."""
     try:
         account_id = get_account_id(account_id)

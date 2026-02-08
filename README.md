@@ -192,8 +192,8 @@ basecamp recordings list --type Todo
 
 ### Search
 
-- `basecamp search <query> [--type <type>] [--bucket-id <id>] [--creator-id <id>] [--file-type <type>] [--exclude-chat] [--page <n>] [--per-page <n>] [--account-id <id>] [--format <format>] [--all-pages]` - Search recordings
-- `basecamp search metadata [--account-id <id>] [--format <format>]` - Get search metadata with valid filter options
+- `basecamp search <query> [--type <type>] [--bucket-id <id>] [--creator-id <id>] [--file-type <type>] [--exclude-chat] [--page <n>] [--per-page <n>] [--account-id <id>] [--format <format>] [--all-pages]` - Search recordings across the account
+- `basecamp search-metadata [--account-id <id>] [--format <format>]` - Get search metadata with valid filter options (use this to see available recording types and file types for filtering)
 
 ## Output Formats
 
@@ -407,13 +407,17 @@ basecamp search "project" --type Document --bucket-id 123
 basecamp search "meeting" --exclude-chat
 
 # Get search metadata to see valid filter options
-basecamp search metadata
+# This shows available recording types and file types you can use with --type and --file-type
+basecamp search-metadata
 
 # Search with pagination
 basecamp search "important" --page 2 --per-page 25
 
-# Load all search results
+# Load all search results automatically
 basecamp search "todo" --all-pages
+
+# Search with interactive pagination (table format)
+basecamp search "meeting" --format table
 ```
 
 ## Project Structure
