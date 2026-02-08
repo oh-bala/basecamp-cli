@@ -19,7 +19,6 @@ class AuthHandler:
     def __init__(self):
         """Initialize authentication handler."""
         self.config = Config()
-        self.token_manager = TokenManager()
 
     def get_authorization_url(self, client_id: str, redirect_uri: str, account_id: Optional[int] = None) -> str:
         """Generate OAuth2 authorization URL.
@@ -90,10 +89,18 @@ class AuthHandler:
             click.echo("OAuth2 not configured. Please run 'basecamp configure' first.", err=True)
             return
 
-        # Save account_id if provided
+        # Get account_id from config if not provided
+        if account_id is None:
+            account_id = self.config.get_account_id()
+        
+        # Save account_id if provided or if we got it from config
         if account_id is not None:
             self.config.set_account_id(account_id)
             click.echo(f"Account ID {account_id} saved as default.")
+        
+        # Create TokenManager with the correct account_id (as string)
+        account_id_str = str(account_id) if account_id else "default"
+        token_manager = TokenManager(account_id=account_id_str)
 
         client_id = oauth_config["client_id"]
         client_secret = oauth_config["client_secret"]
@@ -163,7 +170,7 @@ class AuthHandler:
             expires_in = token_response.get("expires_in")
 
             if access_token:
-                self.token_manager.store_tokens(access_token, refresh_token, expires_in)
+                token_manager.store_tokens(access_token, refresh_token, expires_in)
                 click.echo("Authentication successful! Tokens stored securely.")
             else:
                 click.echo("Error: No access token in response", err=True)

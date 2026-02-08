@@ -117,6 +117,61 @@ def logout():
     click.echo("Logged out successfully. Tokens cleared.")
 
 
+@cli.command("tokens")
+@click.option("--account-id", type=int, help="Basecamp Account ID (uses configured default if not provided)")
+@click.option("--show-full", is_flag=True, help="Show full token values (default: masked)")
+@click.option("--format", type=click.Choice(["json", "table", "plain"]), default="plain", help="Output format (json, table, plain)")
+def get_tokens(account_id: Optional[int], show_full: bool, format: str):
+    """Display stored authentication tokens."""
+    # Get account ID from config if not provided
+    if account_id is None:
+        config = Config()
+        stored_account_id = config.get_account_id()
+        if stored_account_id is not None:
+            account_id = stored_account_id
+    
+    # Use account_id string for TokenManager
+    account_id_str = str(account_id) if account_id else "default"
+    token_manager = TokenManager(account_id=account_id_str)
+    
+    tokens = token_manager.get_tokens()
+    
+    if not tokens:
+        click.echo("No tokens found. Run 'basecamp auth' to authenticate.", err=True)
+        raise click.Abort()
+    
+    # Prepare token data for display
+    token_data = {
+        "account_id": account_id_str,
+        "has_access_token": bool(tokens.get("access_token")),
+        "has_refresh_token": bool(tokens.get("refresh_token")),
+        "is_expired": token_manager.is_token_expired(),
+        "expires_at": tokens.get("expires_at"),
+    }
+    
+    # Add token values (masked or full based on flag)
+    if show_full:
+        token_data["access_token"] = tokens.get("access_token")
+        token_data["refresh_token"] = tokens.get("refresh_token")
+    else:
+        access_token = tokens.get("access_token", "")
+        refresh_token = tokens.get("refresh_token", "")
+        
+        # Mask tokens: show first 8 and last 4 characters
+        def mask_token(token: str) -> str:
+            if not token:
+                return None
+            if len(token) <= 12:
+                return "*" * len(token)
+            return f"{token[:8]}...{token[-4:]}"
+        
+        token_data["access_token"] = mask_token(access_token)
+        token_data["refresh_token"] = mask_token(refresh_token)
+    
+    output = Formatter.format_output(token_data, format)
+    click.echo(output)
+
+
 @cli.group()
 def projects():
     """Manage Basecamp projects."""
