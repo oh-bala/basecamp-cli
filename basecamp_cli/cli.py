@@ -599,6 +599,161 @@ def _handle_search_pagination(client: BasecampAPIClient, query: str, recording_t
     return all_results
 
 
+@cli.group()
+def people():
+    """Manage people in Basecamp."""
+    pass
+
+
+@people.command("list")
+@click.option("--project-id", type=int, help="Filter by project ID (list people on a specific project)")
+@click.option("--account-id", type=int, help="Basecamp Account ID (uses configured default if not provided)")
+@click.option("--format", type=click.Choice(["json", "table", "plain"]), default="plain", help="Output format (json, table, plain)")
+@click.option("--all-pages", is_flag=True, help="Automatically load all pages without interaction")
+def list_people(project_id: Optional[int], account_id: Optional[int], format: str, all_pages: bool):
+    """List all people visible to the current user, or people on a specific project."""
+    try:
+        account_id = get_account_id(account_id)
+        client = BasecampAPIClient(account_id=account_id)
+        
+        if project_id:
+            people_list, next_page_url = client.get_project_people(project_id, all_pages=all_pages)
+            
+            def fetch_next_page(url: str):
+                return client.get_project_people(project_id, page_url=url, all_pages=False)
+        else:
+            people_list, next_page_url = client.get_people(all_pages=all_pages)
+            
+            def fetch_next_page(url: str):
+                return client.get_people(page_url=url, all_pages=False)
+
+        def format_items(items: List[Dict[str, Any]]) -> str:
+            return Formatter.format_output(items, format)
+
+        # For json/plain formats, if not --all-pages, just show first page
+        # For table format, enable interactive pagination
+        interactive = (format == "table" and not all_pages)
+
+        # Handle pagination (interactive or all-pages)
+        all_people = handle_pagination(
+            people_list,
+            next_page_url,
+            fetch_next_page,
+            format_items,
+            all_pages=all_pages,
+            interactive=interactive
+        )
+
+        # Output final result (if not already displayed interactively)
+        if not interactive or all_pages:
+            output = Formatter.format_output(all_people, format)
+            click.echo(output)
+    except BasecampAPIError as e:
+        click.echo(f"Error: {e}", err=True)
+        raise click.Abort()
+
+
+@people.command("get")
+@click.argument("person_id", type=int)
+@click.option("--account-id", type=int, help="Basecamp Account ID (uses configured default if not provided)")
+@click.option("--format", type=click.Choice(["json", "table", "plain"]), default="plain", help="Output format (json, table, plain)")
+def get_person(person_id: int, account_id: Optional[int], format: str):
+    """Get details of a specific person."""
+    try:
+        account_id = get_account_id(account_id)
+        client = BasecampAPIClient(account_id=account_id)
+        person = client.get_person(person_id)
+
+        output = Formatter.format_output(person, format)
+        click.echo(output)
+    except BasecampAPIError as e:
+        click.echo(f"Error: {e}", err=True)
+        raise click.Abort()
+
+
+@people.command("profile")
+@click.option("--account-id", type=int, help="Basecamp Account ID (uses configured default if not provided)")
+@click.option("--format", type=click.Choice(["json", "table", "plain"]), default="plain", help="Output format (json, table, plain)")
+def get_profile(account_id: Optional[int], format: str):
+    """Get current user's personal info."""
+    try:
+        account_id = get_account_id(account_id)
+        client = BasecampAPIClient(account_id=account_id)
+        profile = client.get_my_profile()
+
+        output = Formatter.format_output(profile, format)
+        click.echo(output)
+    except BasecampAPIError as e:
+        click.echo(f"Error: {e}", err=True)
+        raise click.Abort()
+
+
+@people.command("pingable")
+@click.option("--account-id", type=int, help="Basecamp Account ID (uses configured default if not provided)")
+@click.option("--format", type=click.Choice(["json", "table", "plain"]), default="plain", help="Output format (json, table, plain)")
+def list_pingable_people(account_id: Optional[int], format: str):
+    """List all people who can be pinged."""
+    try:
+        account_id = get_account_id(account_id)
+        client = BasecampAPIClient(account_id=account_id)
+        pingable_people = client.get_pingable_people()
+
+        output = Formatter.format_output(pingable_people, format)
+        click.echo(output)
+    except BasecampAPIError as e:
+        click.echo(f"Error: {e}", err=True)
+        raise click.Abort()
+
+
+@people.command("grant-access")
+@click.argument("project_id", type=int)
+@click.option("--grant-ids", help="Comma-separated list of person IDs to grant access to")
+@click.option("--revoke-ids", help="Comma-separated list of person IDs to revoke access from")
+@click.option("--create", help="JSON array of new people to create and grant access to. Each person should have 'name' and 'email_address', and optionally 'title' and 'company_name'")
+@click.option("--account-id", type=int, help="Basecamp Account ID (uses configured default if not provided)")
+@click.option("--format", type=click.Choice(["json", "table", "plain"]), default="plain", help="Output format (json, table, plain)")
+def grant_project_access(project_id: int, grant_ids: Optional[str], revoke_ids: Optional[str], create: Optional[str], account_id: Optional[int], format: str):
+    """Update who can access a project. Grant access, revoke access, or create new people and grant them access."""
+    if not grant_ids and not revoke_ids and not create:
+        click.echo("Error: At least one of --grant-ids, --revoke-ids, or --create must be provided", err=True)
+        raise click.Abort()
+
+    grant_id_list = None
+    if grant_ids:
+        grant_id_list = [int(id.strip()) for id in grant_ids.split(",")]
+
+    revoke_id_list = None
+    if revoke_ids:
+        revoke_id_list = [int(id.strip()) for id in revoke_ids.split(",")]
+
+    create_people_list = None
+    if create:
+        try:
+            create_people_list = json.loads(create)
+            if not isinstance(create_people_list, list):
+                click.echo("Error: --create must be a JSON array", err=True)
+                raise click.Abort()
+        except json.JSONDecodeError as e:
+            click.echo(f"Error: Invalid JSON in --create: {e}", err=True)
+            raise click.Abort()
+
+    try:
+        account_id = get_account_id(account_id)
+        client = BasecampAPIClient(account_id=account_id)
+        result = client.update_project_access(
+            project_id,
+            grant_ids=grant_id_list,
+            revoke_ids=revoke_id_list,
+            create_people=create_people_list
+        )
+
+        output = Formatter.format_output(result, format)
+        click.echo(output)
+    except BasecampAPIError as e:
+        click.echo(f"Error: {e}", err=True)
+        raise click.Abort()
+
+
 @cli.command("search-metadata")
 @click.option("--account-id", type=int, help="Basecamp Account ID (uses configured default if not provided)")
 @click.option("--format", type=click.Choice(["json", "table", "plain"]), default="plain", help="Output format (json, table, plain)")

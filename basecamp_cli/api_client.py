@@ -605,3 +605,221 @@ class BasecampAPIClient:
             return all_data, None
 
         return data, next_page
+
+    def get_people(
+        self,
+        account_id: Optional[int] = None,
+        all_pages: bool = False,
+        page_url: Optional[str] = None
+    ) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+        """Get all people visible to the current user.
+
+        Args:
+            account_id: Account ID (uses instance account_id if not provided)
+            all_pages: If True, fetch all pages automatically
+            page_url: Specific page URL to fetch (for pagination)
+
+        Returns:
+            Tuple of (list of people dictionaries, next_page_url)
+        """
+        account_id = account_id or self.account_id
+        if not account_id:
+            raise BasecampAPIError("Account ID is required")
+
+        if page_url:
+            # Extract endpoint from full URL
+            parsed = urlparse(page_url)
+            endpoint = parsed.path + ("?" + parsed.query if parsed.query else "")
+        else:
+            endpoint = f"/{account_id}/people.json"
+
+        data, response = self._make_request("GET", endpoint, return_response=True)
+        
+        # Parse pagination links
+        link_header = response.headers.get("Link", "")
+        links = self._parse_link_header(link_header)
+        next_page_url = links.get("next")
+
+        # Ensure data is a list
+        if not isinstance(data, list):
+            data = []
+
+        # If all_pages is True, fetch all remaining pages
+        if all_pages and next_page_url:
+            all_data = data.copy()
+            while next_page_url:
+                parsed = urlparse(next_page_url)
+                next_endpoint = parsed.path + ("?" + parsed.query if parsed.query else "")
+                next_data, next_response = self._make_request("GET", next_endpoint, return_response=True)
+                if isinstance(next_data, list):
+                    all_data.extend(next_data)
+                else:
+                    all_data.append(next_data)
+                
+                next_link_header = next_response.headers.get("Link", "")
+                next_links = self._parse_link_header(next_link_header)
+                next_page_url = next_links.get("next")
+            
+            return all_data, None
+
+        return data, next_page_url
+
+    def get_project_people(
+        self,
+        project_id: int,
+        account_id: Optional[int] = None,
+        all_pages: bool = False,
+        page_url: Optional[str] = None
+    ) -> Tuple[List[Dict[str, Any]], Optional[str]]:
+        """Get all people on a project.
+
+        Args:
+            project_id: Project ID
+            account_id: Account ID (uses instance account_id if not provided)
+            all_pages: If True, fetch all pages automatically
+            page_url: Specific page URL to fetch (for pagination)
+
+        Returns:
+            Tuple of (list of people dictionaries, next_page_url)
+        """
+        account_id = account_id or self.account_id
+        if not account_id:
+            raise BasecampAPIError("Account ID is required")
+
+        if page_url:
+            # Extract endpoint from full URL
+            parsed = urlparse(page_url)
+            endpoint = parsed.path + ("?" + parsed.query if parsed.query else "")
+        else:
+            endpoint = f"/{account_id}/projects/{project_id}/people.json"
+
+        data, response = self._make_request("GET", endpoint, return_response=True)
+        
+        # Parse pagination links
+        link_header = response.headers.get("Link", "")
+        links = self._parse_link_header(link_header)
+        next_page_url = links.get("next")
+
+        # Ensure data is a list
+        if not isinstance(data, list):
+            data = []
+
+        # If all_pages is True, fetch all remaining pages
+        if all_pages and next_page_url:
+            all_data = data.copy()
+            while next_page_url:
+                parsed = urlparse(next_page_url)
+                next_endpoint = parsed.path + ("?" + parsed.query if parsed.query else "")
+                next_data, next_response = self._make_request("GET", next_endpoint, return_response=True)
+                if isinstance(next_data, list):
+                    all_data.extend(next_data)
+                else:
+                    all_data.append(next_data)
+                
+                next_link_header = next_response.headers.get("Link", "")
+                next_links = self._parse_link_header(next_link_header)
+                next_page_url = next_links.get("next")
+            
+            return all_data, None
+
+        return data, next_page_url
+
+    def get_person(self, person_id: int, account_id: Optional[int] = None) -> Dict[str, Any]:
+        """Get a specific person.
+
+        Args:
+            person_id: Person ID
+            account_id: Account ID (uses instance account_id if not provided)
+
+        Returns:
+            Person dictionary
+        """
+        account_id = account_id or self.account_id
+        if not account_id:
+            raise BasecampAPIError("Account ID is required")
+
+        endpoint = f"/{account_id}/people/{person_id}.json"
+        return self._make_request("GET", endpoint)
+
+    def get_my_profile(self, account_id: Optional[int] = None) -> Dict[str, Any]:
+        """Get current user's personal info.
+
+        Args:
+            account_id: Account ID (uses instance account_id if not provided)
+
+        Returns:
+            Current user's profile dictionary
+        """
+        account_id = account_id or self.account_id
+        if not account_id:
+            raise BasecampAPIError("Account ID is required")
+
+        endpoint = f"/{account_id}/my/profile.json"
+        return self._make_request("GET", endpoint)
+
+    def get_pingable_people(self, account_id: Optional[int] = None) -> List[Dict[str, Any]]:
+        """Get all people who can be pinged.
+
+        Args:
+            account_id: Account ID (uses instance account_id if not provided)
+
+        Returns:
+            List of pingable people dictionaries
+
+        Note: This endpoint is currently not paginated.
+        """
+        account_id = account_id or self.account_id
+        if not account_id:
+            raise BasecampAPIError("Account ID is required")
+
+        endpoint = f"/{account_id}/circles/people.json"
+        data = self._make_request("GET", endpoint)
+        
+        # Ensure data is a list
+        if not isinstance(data, list):
+            data = []
+        
+        return data
+
+    def update_project_access(
+        self,
+        project_id: int,
+        grant_ids: Optional[List[int]] = None,
+        revoke_ids: Optional[List[int]] = None,
+        create_people: Optional[List[Dict[str, Any]]] = None,
+        account_id: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Update who can access a project.
+
+        Args:
+            project_id: Project ID
+            grant_ids: List of person IDs to grant access to (optional)
+            revoke_ids: List of person IDs to revoke access from (optional)
+            create_people: List of new people to create and grant access to.
+                          Each dict should have 'name' and 'email_address',
+                          and optionally 'title' and 'company_name' (optional)
+            account_id: Account ID (uses instance account_id if not provided)
+
+        Returns:
+            Dictionary with 'granted' and 'revoked' arrays
+
+        Raises:
+            BasecampAPIError: If none of grant_ids, revoke_ids, or create_people are provided
+        """
+        account_id = account_id or self.account_id
+        if not account_id:
+            raise BasecampAPIError("Account ID is required")
+
+        if not grant_ids and not revoke_ids and not create_people:
+            raise BasecampAPIError("At least one of grant_ids, revoke_ids, or create_people must be provided")
+
+        data = {}
+        if grant_ids:
+            data["grant"] = grant_ids
+        if revoke_ids:
+            data["revoke"] = revoke_ids
+        if create_people:
+            data["create"] = create_people
+
+        endpoint = f"/{account_id}/projects/{project_id}/people/users.json"
+        return self._make_request("PUT", endpoint, data=data)
